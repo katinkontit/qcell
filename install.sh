@@ -29,7 +29,7 @@ if (major < 20) {
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-SCRIPT_PATH="${BASH_SOURCE[0]:-}"
+SCRIPT_PATH="${BASH_SOURCE:-}"
 SCRIPT_DIR=""
 if [[ -n "$SCRIPT_PATH" ]]; then
   SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" 2>/dev/null && pwd || true)"
