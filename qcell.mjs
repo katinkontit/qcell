@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { constants as fsConstants } from "node:fs";
+import { constants as fs, readFileSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import path from "node:path";
@@ -14,12 +14,9 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
-const KERNEL_METADATA_FILE = ".qcell-kernel.json";
-const KERNEL_TIMEOUT_SECONDS = 5;
-const PROCESS_TIMEOUT_MS = 7_000;
-const PROCESS_KILL_GRACE_MS = 500;
-const MAX_CHILD_STDOUT_BYTES = 32 * 1024;
-const MAX_CHILD_STDERR_BYTES = 32 * 1024;
+const KERNEL_TIMEOUT = 5;
+const PROCESS_TIMEOUT = 7_000;
+const MAX_OUTPUT = 32 * 1024;
 
 const SYSTEM = `You generate one Python code cell for a Quarto document.
 
@@ -44,175 +41,109 @@ emit_cell must be your final action.
 Do not include Markdown fences in the code passed to emit_cell.`;
 
 const PYTHON_HELPER = String.raw`
-import os
-import queue
-import re
-import signal
-import sys
-import time
-
+import os, queue, re, signal, sys, time
 from jupyter_client import BlockingKernelClient
 
-MAX_OUTPUT_BYTES = 30 * 1024
-ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
-
-connection_file = sys.argv[1]
-timeout = float(sys.argv[2])
-code = sys.argv[3]
+LIMIT = 30 * 1024
+ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+connection_file, timeout, code = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 kernel_pid = int(os.environ["QCELL_KERNEL_PID"])
-
-client = None
-execution_started = False
-output_parts = []
-output_bytes = 0
-output_truncated = False
+client, busy, parts, size, truncated = None, False, [], 0, False
 
 
-def append_output(value):
-    global output_bytes, output_truncated
-    if value is None or output_truncated:
+def add(value):
+    global size, truncated
+    if truncated:
         return
-    text = str(value)
-    encoded = text.encode("utf-8", errors="replace")
-    remaining = MAX_OUTPUT_BYTES - output_bytes
-    if remaining <= 0:
-        output_truncated = True
-        return
-    if len(encoded) > remaining:
-        text = encoded[:remaining].decode("utf-8", errors="ignore")
-        encoded = text.encode("utf-8")
-        output_truncated = True
-    output_parts.append(text)
-    output_bytes += len(encoded)
+    data = str(value).encode("utf-8", "replace")
+    room = LIMIT - size
+    if len(data) > room:
+        data, truncated = data[:max(0, room)], True
+    parts.append(data.decode("utf-8", "ignore"))
+    size += len(data)
 
 
-def interrupt_kernel():
-    if execution_started:
+def interrupt():
+    if busy:
         try:
             os.kill(kernel_pid, signal.SIGINT)
         except (ProcessLookupError, PermissionError):
             pass
 
 
-def terminate_helper(_signum, _frame):
-    interrupt_kernel()
+def terminate(*_):
+    interrupt()
     raise KeyboardInterrupt("helper terminated")
 
 
-signal.signal(signal.SIGTERM, terminate_helper)
+signal.signal(signal.SIGTERM, terminate)
 
 try:
     client = BlockingKernelClient()
     client.load_connection_file(connection_file)
     client.start_channels()
     client.wait_for_ready(timeout=timeout)
-
-    msg_id = client.execute(
-        code,
-        silent=False,
-        store_history=False,
-        allow_stdin=False,
-        stop_on_error=True,
-    )
-    deadline = time.monotonic() + timeout
-    error_text = None
+    msg_id = client.execute(code, silent=False, store_history=False,
+                            allow_stdin=False, stop_on_error=True)
+    deadline, failure = time.monotonic() + timeout, None
 
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            interrupt_kernel()
+            interrupt()
             raise TimeoutError(f"kernel execution exceeded {timeout:g} seconds")
-
         try:
             message = client.get_iopub_msg(timeout=min(remaining, 0.25))
         except queue.Empty:
             continue
-
-        parent_id = (message.get("parent_header") or {}).get("msg_id")
-        if parent_id != msg_id:
+        if (message.get("parent_header") or {}).get("msg_id") != msg_id:
             continue
 
-        msg_type = message.get("msg_type") or (message.get("header") or {}).get("msg_type")
+        kind = message.get("msg_type") or (message.get("header") or {}).get("msg_type")
         content = message.get("content") or {}
-
-        if msg_type == "status":
+        if kind == "status":
             state = content.get("execution_state")
-            if state == "busy":
-                execution_started = True
-            elif state == "idle":
+            busy = busy or state == "busy"
+            if state == "idle":
                 break
-        elif msg_type == "stream":
-            append_output(content.get("text", ""))
-        elif msg_type in ("execute_result", "display_data"):
+        elif kind == "stream":
+            add(content.get("text", ""))
+        elif kind in ("execute_result", "display_data"):
             data = content.get("data") or {}
             if "text/plain" in data:
-                append_output(data["text/plain"])
-                append_output("\n")
-            for mime_type in sorted(key for key in data if key != "text/plain"):
-                append_output(f"[{mime_type} output]\n")
-        elif msg_type == "error":
+                add(data["text/plain"] + "\n")
+            for mime in sorted(set(data) - {"text/plain"}):
+                add(f"[{mime} output]\n")
+        elif kind == "error":
             traceback = content.get("traceback") or []
-            if traceback:
-                error_text = "\n".join(ANSI_RE.sub("", str(line)) for line in traceback)
-            else:
-                name = content.get("ename", "PythonError")
-                value = content.get("evalue", "")
-                error_text = f"{name}: {value}".rstrip()
+            failure = ("\n".join(ANSI.sub("", str(line)) for line in traceback)
+                       if traceback else
+                       f"{content.get('ename', 'PythonError')}: {content.get('evalue', '')}".rstrip())
 
-    if error_text is not None:
-        raise RuntimeError(error_text)
-
-    result = "".join(output_parts)
-    if output_truncated:
+    if failure:
+        raise RuntimeError(failure)
+    result = "".join(parts)
+    if truncated:
         marker = "\n[output truncated at 30 KB]"
-        marker_bytes = marker.encode("utf-8")
-        result_bytes = result.encode("utf-8")
-        result = (result_bytes[:max(0, MAX_OUTPUT_BYTES - len(marker_bytes))]
-                  .decode("utf-8", errors="ignore") + marker)
+        result = (result.encode()[:LIMIT - len(marker.encode())]
+                  .decode("utf-8", "ignore") + marker)
     sys.stdout.write(result)
 except BaseException as error:
-    message = ANSI_RE.sub("", str(error)).strip() or error.__class__.__name__
-    encoded = message.encode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
-    sys.stderr.write(encoded.decode("utf-8", errors="ignore") + "\n")
+    message = ANSI.sub("", str(error)).strip() or error.__class__.__name__
+    sys.stderr.write(message.encode("utf-8", "replace")[:LIMIT].decode("utf-8", "ignore") + "\n")
     sys.exit(1)
 finally:
-    if client is not None:
+    if client:
         try:
             client.stop_channels()
         except Exception:
             pass
 `;
 
-function appendCapped(chunks, chunk, state, limit) {
-  const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-  const remaining = limit - state.bytes;
-  if (remaining <= 0) return;
-  const kept = buffer.subarray(0, remaining);
-  chunks.push(kept);
-  state.bytes += kept.length;
-}
+const cell = (code) => `\`\`\`{python}\n${code.trimEnd()}\n\`\`\`\n`;
+const textResult = (text) => ({ content: [{ type: "text", text }], details: {} });
 
-function formatCell(code) {
-  return `\`\`\`{python}\n${code.trimEnd()}\n\`\`\`\n`;
-}
-
-function writeCell(code) {
-  process.stdout.write(formatCell(code));
-}
-
-function report(error) {
-  const detail = error instanceof Error ? (error.stack || error.message) : String(error);
-  process.stderr.write(`qcell: ${detail}\n`);
-}
-
-async function readInstruction() {
-  process.stdin.setEncoding("utf8");
-  let input = "";
-  for await (const chunk of process.stdin) input += chunk;
-  return input.trim();
-}
-
-async function processExists(pid) {
+function alive(pid) {
   try {
     process.kill(pid, 0);
     return true;
@@ -221,167 +152,107 @@ async function processExists(pid) {
   }
 }
 
-async function loadKernelMetadata(cwd) {
+async function kernelMetadata() {
   try {
-    const metadataPath = path.join(cwd, KERNEL_METADATA_FILE);
-    const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+    const value = JSON.parse(await readFile(".qcell-kernel.json", "utf8"));
     if (
-      typeof metadata.connection_file !== "string" ||
-      metadata.connection_file.trim() === "" ||
-      typeof metadata.python !== "string" ||
-      metadata.python.trim() === "" ||
-      !Number.isInteger(metadata.pid) ||
-      metadata.pid <= 0
-    ) {
-      return null;
-    }
+      typeof value.connection_file !== "string" || !value.connection_file.trim() ||
+      typeof value.python !== "string" || !value.python.trim() ||
+      !Number.isInteger(value.pid) || value.pid < 1
+    ) return null;
 
-    const connectionFile = path.isAbsolute(metadata.connection_file)
-      ? metadata.connection_file
-      : path.resolve(cwd, metadata.connection_file);
-    const python = path.isAbsolute(metadata.python)
-      ? metadata.python
-      : path.resolve(cwd, metadata.python);
-
-    await access(connectionFile, fsConstants.R_OK);
-    await access(python, fsConstants.X_OK);
-    if (!(await processExists(metadata.pid))) return null;
-
-    return { connectionFile, python, pid: metadata.pid };
+    const connectionFile = path.resolve(value.connection_file);
+    const python = path.resolve(value.python);
+    await access(connectionFile, fs.R_OK);
+    await access(python, fs.X_OK);
+    return alive(value.pid) ? { connectionFile, python, pid: value.pid } : null;
   } catch {
     return null;
   }
 }
 
-function executeInKernel(metadata, code, abortSignal) {
+function capture(stream) {
+  const chunks = [];
+  let size = 0;
+  stream.on("data", (chunk) => {
+    const kept = chunk.subarray(0, MAX_OUTPUT - size);
+    if (kept.length) chunks.push(kept);
+    size += kept.length;
+  });
+  return () => Buffer.concat(chunks).toString("utf8");
+}
+
+function runPython(metadata, code, signal) {
   return new Promise((resolve, reject) => {
-    if (abortSignal?.aborted) {
-      reject(new Error("Python exploration aborted"));
-      return;
-    }
+    if (signal?.aborted) return reject(new Error("Python exploration aborted"));
 
-    const child = spawn(
-      metadata.python,
-      [
-        "-c",
-        PYTHON_HELPER,
-        metadata.connectionFile,
-        String(KERNEL_TIMEOUT_SECONDS),
-        code,
-      ],
-      {
-        cwd: process.cwd(),
-        env: { ...process.env, QCELL_KERNEL_PID: String(metadata.pid) },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
+    const child = spawn(metadata.python, [
+      "-c", PYTHON_HELPER, metadata.connectionFile, String(KERNEL_TIMEOUT), code,
+    ], {
+      env: { ...process.env, QCELL_KERNEL_PID: String(metadata.pid) },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const stdout = capture(child.stdout);
+    const stderr = capture(child.stderr);
+    let done = false;
+    let forcedError;
+    let killTimer;
 
-    const stdout = [];
-    const stderr = [];
-    const stdoutState = { bytes: 0 };
-    const stderrState = { bytes: 0 };
-    let settled = false;
-    let forcedError = null;
-    let killTimer = null;
-
-    const terminate = (error) => {
-      if (settled || forcedError) return;
+    const stop = (error) => {
+      if (done || forcedError) return;
       forcedError = error;
       child.kill("SIGTERM");
-      killTimer = setTimeout(() => child.kill("SIGKILL"), PROCESS_KILL_GRACE_MS);
+      killTimer = setTimeout(() => child.kill("SIGKILL"), 500);
       killTimer.unref();
     };
-
-    const onAbort = () => terminate(new Error("Python exploration aborted"));
-    abortSignal?.addEventListener("abort", onAbort, { once: true });
-
-    child.stdout.on("data", (chunk) =>
-      appendCapped(stdout, chunk, stdoutState, MAX_CHILD_STDOUT_BYTES),
+    const abort = () => stop(new Error("Python exploration aborted"));
+    const timeout = setTimeout(
+      () => stop(new Error("Python helper exceeded its process timeout")),
+      PROCESS_TIMEOUT,
     );
-    child.stderr.on("data", (chunk) =>
-      appendCapped(stderr, chunk, stderrState, MAX_CHILD_STDERR_BYTES),
-    );
+    timeout.unref();
+    signal?.addEventListener("abort", abort, { once: true });
 
-    const processTimer = setTimeout(
-      () => terminate(new Error("Python helper exceeded its process timeout")),
-      PROCESS_TIMEOUT_MS,
-    );
-    processTimer.unref();
-
-    child.once("error", (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(processTimer);
-      if (killTimer) clearTimeout(killTimer);
-      abortSignal?.removeEventListener("abort", onAbort);
-      reject(error);
-    });
-
-    child.once("close", (status, signal) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(processTimer);
-      if (killTimer) clearTimeout(killTimer);
-      abortSignal?.removeEventListener("abort", onAbort);
-
-      if (forcedError) {
-        reject(forcedError);
-        return;
-      }
-
-      const stdoutText = Buffer.concat(stdout).toString("utf8");
-      const stderrText = Buffer.concat(stderr).toString("utf8").trim();
-      if (status === 0) {
-        resolve(stdoutText);
-      } else {
-        reject(new Error(stderrText || `Python helper exited with status ${status ?? signal}`));
-      }
-    });
+    const finish = (error, status, exitSignal) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timeout);
+      clearTimeout(killTimer);
+      signal?.removeEventListener("abort", abort);
+      if (error || forcedError) return reject(error || forcedError);
+      if (status === 0) return resolve(stdout());
+      reject(new Error(stderr().trim() || `Python helper exited with status ${status ?? exitSignal}`));
+    };
+    child.once("error", (error) => finish(error));
+    child.once("close", (status, exitSignal) => finish(null, status, exitSignal));
   });
 }
 
-async function generateCell(instruction, metadata) {
+async function generate(instruction, metadata) {
   let finalCode = null;
+  const schema = Type.Object({ code: Type.String() });
 
   const pythonTool = defineTool({
     name: "python",
     label: "Python",
     description: "Execute Python in the live Quarto kernel for exploration and verification.",
-    parameters: Type.Object({
-      code: Type.String({ description: "Python source to execute" }),
-    }),
-    execute: async (_toolCallId, params, signal) => {
-      const stdout = await executeInKernel(metadata, params.code, signal);
-      return {
-        content: [{ type: "text", text: stdout || "<no output>" }],
-        details: {},
-      };
-    },
+    parameters: schema,
+    execute: async (_id, { code }, signal) =>
+      textResult((await runPython(metadata, code, signal)) || "<no output>"),
   });
 
   const emitTool = defineTool({
     name: "emit_cell",
     label: "Emit Cell",
     description: "Return the complete final Python source for the single Quarto cell.",
-    parameters: Type.Object({
-      code: Type.String({ description: "Complete standalone Python source for the cell" }),
-    }),
-    execute: async (_toolCallId, params) => {
-      if (typeof params.code !== "string" || params.code.trim() === "") {
-        throw new Error("emit_cell requires non-empty Python source");
-      }
-      if (params.code.includes("```") || params.code.includes("~~~")) {
+    parameters: schema,
+    execute: async (_id, { code }) => {
+      if (!code.trim()) throw new Error("emit_cell requires non-empty Python source");
+      if (code.includes("```") || code.includes("~~~"))
         throw new Error("emit_cell source must not contain Markdown fences");
-      }
-      if (finalCode !== null) {
-        throw new Error("emit_cell has already been called");
-      }
-      finalCode = params.code.trimEnd();
-      return {
-        content: [{ type: "text", text: "Cell accepted." }],
-        details: {},
-        terminate: true,
-      };
+      if (finalCode !== null) throw new Error("emit_cell has already been called");
+      finalCode = code.trimEnd();
+      return { ...textResult("Cell accepted."), terminate: true };
     },
   });
 
@@ -397,16 +268,10 @@ async function generateCell(instruction, metadata) {
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
-    additionalExtensionPaths: [],
-    additionalSkillPaths: [],
-    additionalPromptTemplatePaths: [],
-    additionalThemePaths: [],
-    extensionFactories: [],
     extensionsOverride: (base) => ({ ...base, extensions: [], errors: [] }),
     skillsOverride: () => ({ skills: [], diagnostics: [] }),
     agentsFilesOverride: () => ({ agentsFiles: [] }),
     promptsOverride: () => ({ prompts: [], diagnostics: [] }),
-    themesOverride: () => ({ themes: [], diagnostics: [] }),
     systemPromptOverride: () => SYSTEM,
     appendSystemPromptOverride: () => [],
   });
@@ -423,42 +288,25 @@ async function generateCell(instruction, metadata) {
       customTools: [pythonTool, emitTool],
       tools: ["python", "emit_cell"],
     }));
-
-    const activeTools = session.agent.state.tools.map((tool) => tool.name).sort();
-    if (activeTools.length !== 2 || activeTools[0] !== "emit_cell" || activeTools[1] !== "python") {
-      throw new Error(`Unexpected active tools: ${activeTools.join(", ") || "<none>"}`);
-    }
-
+    const tools = session.agent.state.tools.map(({ name }) => name).sort();
+    if (tools.join() !== "emit_cell,python")
+      throw new Error(`Unexpected active tools: ${tools.join(", ") || "<none>"}`);
     await session.prompt(instruction);
+    return finalCode;
   } finally {
     session?.dispose();
-  }
-
-  return finalCode;
-}
-
-async function main() {
-  const instruction = await readInstruction();
-  if (!instruction) return;
-
-  const metadata = await loadKernelMetadata(process.cwd());
-  if (!metadata) {
-    writeCell("# qcell: no live Quarto kernel found");
-    return;
-  }
-
-  try {
-    const finalCode = await generateCell(instruction, metadata);
-    writeCell(finalCode ?? "# qcell: no code generated");
-  } catch (error) {
-    report(error);
-    writeCell("# qcell: agent failed");
   }
 }
 
 try {
-  await main();
+  const instruction = readFileSync(0, "utf8").trim();
+  if (instruction) {
+    const metadata = await kernelMetadata();
+    process.stdout.write(cell(metadata
+      ? (await generate(instruction, metadata)) ?? "# qcell: no code generated"
+      : "# qcell: no live Quarto kernel found"));
+  }
 } catch (error) {
-  report(error);
-  writeCell("# qcell: agent failed");
+  process.stderr.write(`qcell: ${error?.stack || error}\n`);
+  process.stdout.write(cell("# qcell: agent failed"));
 }
