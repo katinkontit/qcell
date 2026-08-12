@@ -21,6 +21,7 @@ qcell → Pi SDK agent
 - One executable Node.js program: `qcell.mjs`
 - No Pi CLI subprocess, extension, daemon, or persistent Pi session
 - Exactly two model-visible tools: `python` and `emit_cell`
+- Full current QMD source supplied as context, plus live-kernel inspection
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
 - One fenced Quarto Python cell on stdout; diagnostics go to stderr
@@ -214,8 +215,10 @@ Merge the following into `~/.config/helix/config.toml`:
 
 ```toml
 [keys.normal.space]
-a = ":pipe qcell"
+a = [":write", ":pipe qcell \"%{buffer_name}\""]
 ```
+
+The binding first saves the QMD so qcell reads current source, then passes its path while piping the selected instruction. The model can therefore see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
 
 The same snippet is in [`helix/config.toml`](helix/config.toml).
 
@@ -247,12 +250,14 @@ hx document.qmd
 You can test the same transformation from a shell, provided the shell is in the document directory:
 
 ```bash
-printf 'make a scatter plot of mpg against horsepower from df' | qcell
+printf 'make a scatter plot of mpg against horsepower from df' | qcell document.qmd
 ```
 
-## How kernel exploration works
+## How document context and kernel exploration work
 
-The agent may inspect existing state:
+qcell supplies the full QMD source as read-only model context. The source identifies established imports, variable names, document intent, and legitimate earlier dependencies. The model still has no general file-reading tool.
+
+The agent may inspect live state only when runtime details are useful:
 
 ```python
 df.columns
