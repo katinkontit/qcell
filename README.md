@@ -39,14 +39,21 @@ The Pi SDK can use its existing credential store at `~/.pi/agent/auth.json` or p
 
 ## Install qcell
 
+Run the installer directly from GitHub:
+
 ```bash
-mkdir -p ~/.local/lib ~/.local/bin
-git clone https://github.com/katinkontit/qcell.git ~/.local/lib/qcell
-cd ~/.local/lib/qcell
-npm ci --omit=dev
-chmod +x qcell.mjs
-ln -sfn ~/.local/lib/qcell/qcell.mjs ~/.local/bin/qcell
+curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh | bash
 ```
+
+Or clone the repository, inspect the installer, and run it locally:
+
+```bash
+git clone https://github.com/katinkontit/qcell.git
+cd qcell
+./install.sh
+```
+
+The installer checks for Node.js 20+, installs the locked npm dependencies under `~/.local/lib/qcell`, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
 
 Ensure `~/.local/bin` is in `PATH`:
 
@@ -67,10 +74,34 @@ The second command is expected to report no kernel until the Quarto setup below 
 
 ### Update
 
+Rerun the installer:
+
 ```bash
-cd ~/.local/lib/qcell
+curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh | bash
+```
+
+When installing from a clone, pull and rerun the local script instead:
+
+```bash
 git pull --ff-only
-npm ci --omit=dev
+./install.sh
+```
+
+### Custom install paths
+
+The installer supports environment overrides:
+
+```bash
+QCELL_INSTALL_DIR=/opt/qcell \
+QCELL_BIN_DIR="$HOME/bin" \
+./install.sh
+```
+
+### Uninstall
+
+```bash
+rm -f ~/.local/bin/qcell
+rm -rf ~/.local/lib/qcell
 ```
 
 ## Prepare Python
@@ -104,7 +135,7 @@ Use a long-lived execution daemon, Jupyter caching, automatic freezing, hidden c
 
 ```yaml
 ---
-title: "O.O"
+title: "v1"
 execute:
   daemon: 3600
   cache: true
@@ -149,7 +180,7 @@ The cell creates `.qcell-kernel.json` in the document working directory. It must
 .qcell-kernel.json
 ```
 
-A complete working starter document, including the required cell, is available at [`qcell-starter.qmd`](qcell-starter.qmd). Copy it into a project rather than removing the registration cell.
+A complete working document, including the required cell and a sample qcell instruction, is available at [`v1.qmd`](v1.qmd). Copy it into a project rather than removing the registration cell.
 
 ## Start Quarto Preview
 
