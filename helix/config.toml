@@ -1,3 +1,4 @@
 # Merge this binding into ~/.config/helix/config.toml.
 [keys.normal.space]
-a = ":pipe qcell -qmd \"%{buffer_name}\""
+a = ":pipe qcell"
+A = ":pipe qcell -qmd \"%{buffer_name}\""

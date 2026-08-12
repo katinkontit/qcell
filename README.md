@@ -216,16 +216,14 @@ Merge the following into `~/.config/helix/config.toml`:
 
 ```toml
 [keys.normal.space]
-a = ":pipe qcell -qmd \"%{buffer_name}\""
-```
-
-`-qmd <path>` opts into full-document context. The binding passes the current QMD path while piping the selected instruction. qcell reads the saved file, so save before invoking it when the buffer has changed. The model can then see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
-
-To use only the instruction and live kernel, omit the flag:
-
-```toml
 a = ":pipe qcell"
+A = ":pipe qcell -qmd \"%{buffer_name}\""
 ```
+
+- `Space`, `a`: use only the selected instruction and live kernel.
+- `Space`, `A`: also append the full saved QMD as context.
+
+`-qmd <path>` opts into full-document context. qcell reads the saved file, so save before using `Space`, `A` when the buffer has changed. The model can then see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
 
 The same snippet is in [`helix/config.toml`](helix/config.toml).
 
