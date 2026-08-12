@@ -1,8 +1,13 @@
 ---
-title: "qcell example"
-format: html
+title: "O.O"
 execute:
   daemon: 3600
+  cache: true
+  freeze: auto
+  echo: false
+format:
+  html:
+    code-fold: true
 ---
 
 ```{python}

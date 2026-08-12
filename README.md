@@ -75,7 +75,7 @@ npm ci --omit=dev
 
 ## Prepare Python
 
-Install `jupyter_client` and `ipykernel` in the exact environment Quarto will use.
+Install `jupyter_client` and `ipykernel` in the exact environment Quarto will use. The example configuration also enables Quarto's Jupyter cache, which requires `jupyter-cache`. `pyright` is optional and provides Python editor diagnostics.
 
 ### With uv
 
@@ -83,29 +83,40 @@ From the Quarto project:
 
 ```bash
 uv venv
-uv pip install --python .venv/bin/python jupyter-client ipykernel
+. .venv/bin/activate
+uv pip install ipykernel jupyter-client jupyter-cache pyright
 export QUARTO_PYTHON="$PWD/.venv/bin/python"
+hx document.qmd
 ```
 
-If the project already has a uv environment, use its interpreter instead of creating another one. `qcell` reads `sys.executable` from the running kernel and always launches its helper with that same interpreter; it does not need a separate uv execution mode.
+If the project already has a uv environment, activate it instead of creating another one. `qcell` reads `sys.executable` from the running kernel and always launches its helper with that same interpreter; it does not need a separate uv execution mode.
 
 ### Without uv
 
 ```bash
-python -m pip install jupyter-client ipykernel
+python -m pip install jupyter-client ipykernel jupyter-cache pyright
 export QUARTO_PYTHON="$(command -v python)"
 ```
 
 ## Prepare the Quarto document
 
-Set a long-lived execution daemon in the document YAML. The preview server and Python kernel are separate: a running preview page alone does not mean the kernel is alive.
+Use a long-lived execution daemon, Jupyter caching, automatic freezing, hidden code output, and folded HTML code:
 
 ```yaml
 ---
+title: "O.O"
 execute:
   daemon: 3600
+  cache: true
+  freeze: auto
+  echo: false
+format:
+  html:
+    code-fold: true
 ---
 ```
+
+The preview server and Python kernel are separate: a running preview page alone does not mean the kernel is alive. `cache: true` requires the `jupyter-cache` package installed above. `freeze: auto` lets Quarto reuse stored computational output when appropriate.
 
 Put this hidden cell near the beginning of the document:
 
@@ -144,14 +155,13 @@ From the directory containing the `.qmd` and `.qcell-kernel.json`:
 quarto preview document.qmd
 ```
 
-For a container with port `8888` published:
+For a container with port `8888` published, run this from the shell or from Helix with `:sh`:
 
 ```bash
-quarto preview document.qmd \
-  --host 0.0.0.0 \
-  --port 8888 \
-  --no-browser
+quarto preview document.qmd --host 0.0.0.0 --port 8888 --no-browser
 ```
+
+Use two ASCII hyphens in `--host` and `--port`, not typographic em dashes.
 
 Wait for the first render. The metadata cell must execute before qcell can connect. When Quarto replaces the daemon, the next document execution rewrites the metadata with the new connection file, PID, and interpreter.
 
