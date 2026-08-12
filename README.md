@@ -215,10 +215,10 @@ Merge the following into `~/.config/helix/config.toml`:
 
 ```toml
 [keys.normal.space]
-a = [":write", ":pipe qcell \"%{buffer_name}\""]
+a = ":pipe qcell \"%{buffer_name}\""
 ```
 
-The binding first saves the QMD so qcell reads current source, then passes its path while piping the selected instruction. The model can therefore see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
+The binding passes the current QMD path while piping the selected instruction. qcell reads the saved file, so save before invoking it when the buffer has changed. The model can therefore see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
 
 The same snippet is in [`helix/config.toml`](helix/config.toml).
 
