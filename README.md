@@ -24,6 +24,7 @@ qcell → Pi SDK agent
 - Full current QMD source supplied as context, plus live-kernel inspection
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
+- Hard 18-second agent limit so the editor is released within 20 seconds
 - One fenced Quarto Python cell on stdout; diagnostics go to stderr
 - A fresh in-memory Pi session for every editor invocation
 
@@ -298,7 +299,7 @@ It does not receive filesystem or shell tools. qcell uses:
 - a fixed system prompt;
 - a terminating `emit_cell` result.
 
-Exploratory output is capped at about 30 KB. Unsupported rich output is represented by compact markers such as `[image/png output]`. Infinite exploratory code is interrupted after five seconds, and the helper process has a slightly longer grace timeout.
+Exploratory output is capped at about 30 KB. Unsupported rich output is represented by compact markers such as `[image/png output]`. Infinite exploratory code is interrupted after five seconds, and the helper process has a slightly longer grace timeout. The agent work has a hard 18-second limit, including model latency and all tool calls, leaving startup headroom so Helix is released within 20 seconds.
 
 ## Troubleshooting
 

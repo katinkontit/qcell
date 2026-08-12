@@ -16,7 +16,10 @@ import {
 
 const KERNEL_TIMEOUT = 5;
 const PROCESS_TIMEOUT = 7_000;
+const TOTAL_TIMEOUT = 18_000;
 const MAX_OUTPUT = 32 * 1024;
+let activeChild;
+let activeSession;
 
 const SYSTEM = `You generate one Python code cell for a Quarto document.
 
@@ -187,7 +190,7 @@ function runPython(metadata, code, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error("Python exploration aborted"));
 
-    const child = spawn(metadata.python, [
+    const child = activeChild = spawn(metadata.python, [
       "-c", PYTHON_HELPER, metadata.connectionFile, String(KERNEL_TIMEOUT), code,
     ], {
       env: { ...process.env, QCELL_KERNEL_PID: String(metadata.pid) },
@@ -217,6 +220,7 @@ function runPython(metadata, code, signal) {
     const finish = (error, status, exitSignal) => {
       if (done) return;
       done = true;
+      if (activeChild === child) activeChild = undefined;
       clearTimeout(timeout);
       clearTimeout(killTimer);
       signal?.removeEventListener("abort", abort);
@@ -291,12 +295,14 @@ async function generate(instruction, metadata, document) {
       customTools: [pythonTool, emitTool],
       tools: ["python", "emit_cell"],
     }));
+    activeSession = session;
     const tools = session.agent.state.tools.map(({ name }) => name).sort();
     if (tools.join() !== "emit_cell,python")
       throw new Error(`Unexpected active tools: ${tools.join(", ") || "<none>"}`);
     await session.prompt(instruction);
     return finalCode;
   } finally {
+    if (activeSession === session) activeSession = undefined;
     session?.dispose();
   }
 }
@@ -304,11 +310,22 @@ async function generate(instruction, metadata, document) {
 try {
   const instruction = readFileSync(0, "utf8").trim();
   if (instruction) {
-    const metadata = await kernelMetadata();
-    const document = process.argv[2] ? await readFile(path.resolve(process.argv[2]), "utf8") : "";
-    process.stdout.write(cell(metadata
-      ? (await generate(instruction, metadata, document)) ?? "# qcell: no code generated"
-      : "# qcell: no live Quarto kernel found"));
+    const watchdog = setTimeout(() => {
+      void activeSession?.abort();
+      activeChild?.kill("SIGTERM");
+      process.stderr.write("qcell: timed out\n");
+      process.stdout.write(cell("# qcell: agent timed out"));
+      process.exit(0);
+    }, TOTAL_TIMEOUT);
+    try {
+      const metadata = await kernelMetadata();
+      const document = process.argv[2] ? await readFile(path.resolve(process.argv[2]), "utf8") : "";
+      process.stdout.write(cell(metadata
+        ? (await generate(instruction, metadata, document)) ?? "# qcell: no code generated"
+        : "# qcell: no live Quarto kernel found"));
+    } finally {
+      clearTimeout(watchdog);
+    }
   }
 } catch (error) {
   process.stderr.write(`qcell: ${error?.stack || error}\n`);
