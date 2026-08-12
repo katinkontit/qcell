@@ -75,7 +75,7 @@ npm ci --omit=dev
 
 ## Prepare Python
 
-Install `jupyter_client` and `ipykernel` in the exact environment Quarto will use. The example configuration also enables Quarto's Jupyter cache, which requires `jupyter-cache`. `pyright` is optional and provides Python editor diagnostics.
+Install `jupyter_client` and `ipykernel` in the exact environment Quarto will use. The recommended document configuration below also enables Quarto's Jupyter cache, which requires `jupyter-cache`. `pyright` is optional and provides Python editor diagnostics.
 
 ### With uv
 
@@ -116,9 +116,13 @@ format:
 ---
 ```
 
+`echo` is an execution option and therefore belongs under `execute`. `code-fold` controls HTML presentation and belongs under `format.html`. Because `echo: false` hides code globally, folding matters only for cells that override `echo: true`.
+
 The preview server and Python kernel are separate: a running preview page alone does not mean the kernel is alive. `cache: true` requires the `jupyter-cache` package installed above. `freeze: auto` lets Quarto reuse stored computational output when appropriate.
 
-Put this hidden cell near the beginning of the document:
+### Required kernel-registration cell
+
+This is not optional example code. Put it first among the document's executable cells. qcell cannot connect until this cell has executed for the current daemon kernel:
 
 ````markdown
 ```{python}
@@ -139,13 +143,13 @@ Path(".qcell-kernel.json").write_text(json.dumps({
 ```
 ````
 
-The cell creates `.qcell-kernel.json` in the document working directory. It is runtime metadata, not source. Add it to the Quarto project's `.gitignore`:
+The cell creates `.qcell-kernel.json` in the document working directory. It must execute at least once for every new daemon kernel. It is runtime metadata, not source. Add it to the Quarto project's `.gitignore`:
 
 ```gitignore
 .qcell-kernel.json
 ```
 
-A complete starter document is available at [`examples/example.qmd`](examples/example.qmd).
+A complete working starter document, including the required cell, is available at [`qcell-starter.qmd`](qcell-starter.qmd). Copy it into a project rather than removing the registration cell.
 
 ## Start Quarto Preview
 
@@ -163,7 +167,15 @@ quarto preview document.qmd --host 0.0.0.0 --port 8888 --no-browser
 
 Use two ASCII hyphens in `--host` and `--port`, not typographic em dashes.
 
-Wait for the first render. The metadata cell must execute before qcell can connect. When Quarto replaces the daemon, the next document execution rewrites the metadata with the new connection file, PID, and interpreter.
+Wait for the first execution. The registration cell must run before qcell can connect. A normal source-changing execution rewrites the metadata when Quarto replaces the daemon.
+
+Caching or freezing can reuse old computation without starting a replacement kernel. If qcell reports `no live Quarto kernel found` after the daemon expires or restarts, force one fresh execution so the registration cell and document state are rebuilt:
+
+```bash
+quarto render document.qmd --cache-refresh
+```
+
+Then start or continue Preview. Do not trust an old `.qcell-kernel.json`; qcell checks that its connection file, interpreter, and PID are still valid.
 
 ## Configure Helix
 
