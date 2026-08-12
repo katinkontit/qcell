@@ -21,7 +21,7 @@ qcell → Pi SDK agent
 - One executable Node.js program: `qcell.mjs`
 - No Pi CLI subprocess, extension, daemon, or persistent Pi session
 - Exactly two model-visible tools: `python` and `emit_cell`
-- Full current QMD source supplied as context, plus live-kernel inspection
+- Optional full-QMD context with `-qmd`, plus live-kernel inspection
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
 - Hard 18-second agent limit so the editor is released within 20 seconds
@@ -216,10 +216,16 @@ Merge the following into `~/.config/helix/config.toml`:
 
 ```toml
 [keys.normal.space]
-a = ":pipe qcell \"%{buffer_name}\""
+a = ":pipe qcell -qmd \"%{buffer_name}\""
 ```
 
-The binding passes the current QMD path while piping the selected instruction. qcell reads the saved file, so save before invoking it when the buffer has changed. The model can therefore see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
+`-qmd <path>` opts into full-document context. The binding passes the current QMD path while piping the selected instruction. qcell reads the saved file, so save before invoking it when the buffer has changed. The model can then see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
+
+To use only the instruction and live kernel, omit the flag:
+
+```toml
+a = ":pipe qcell"
+```
 
 The same snippet is in [`helix/config.toml`](helix/config.toml).
 
@@ -251,12 +257,12 @@ hx document.qmd
 You can test the same transformation from a shell, provided the shell is in the document directory:
 
 ```bash
-printf 'make a scatter plot of mpg against horsepower from df' | qcell document.qmd
+printf 'make a scatter plot of mpg against horsepower from df' | qcell -qmd document.qmd
 ```
 
 ## How document context and kernel exploration work
 
-qcell supplies the full QMD source as read-only model context. The source identifies established imports, variable names, document intent, and legitimate earlier dependencies. The model still has no general file-reading tool.
+With `-qmd <path>`, qcell supplies the full QMD source as read-only model context. The source identifies established imports, variable names, document intent, and legitimate earlier dependencies. Without the flag, no document source is appended. The model never receives a general file-reading tool.
 
 The agent may inspect live state only when runtime details are useful:
 
