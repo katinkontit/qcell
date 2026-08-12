@@ -1,0 +1,25 @@
+---
+title: "qcell example"
+format: html
+execute:
+  daemon: 3600
+---
+
+```{python}
+#| echo: false
+#| output: false
+
+import json
+import os
+import sys
+from pathlib import Path
+from ipykernel.connect import get_connection_file
+
+Path(".qcell-kernel.json").write_text(json.dumps({
+    "connection_file": get_connection_file(),
+    "pid": os.getpid(),
+    "python": sys.executable,
+}))
+```
+
+Select an instruction in Helix, such as `make a NumPy array from 1 to 10`, and run the qcell binding. Helix replaces the instruction with the generated Python cell.

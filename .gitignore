@@ -1,0 +1,10 @@
+node_modules/
+.qcell-kernel.json
+.venv/
+.quarto/
+_site/
+*_files/
+*.html
+__pycache__/
+.DS_Store
+npm-debug.log*
