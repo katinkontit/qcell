@@ -9,7 +9,7 @@ instruction selected in Helix
         ↓
 qcell → Pi SDK agent
         ├── live_kernel: inspect the live Quarto kernel
-        └── emit_cell: return final Python source
+        └── emit_cell: return the complete fenced cell
         ↓
 ```{python}
 ...
@@ -24,8 +24,8 @@ qcell → Pi SDK agent
 - Optional full-QMD context with `-qmd`, plus live-kernel inspection
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
-- Hard 18-second agent limit so the editor is released within 20 seconds
-- One fenced Quarto Python cell on stdout; diagnostics go to stderr
+- Hard 10-second agent limit so the editor is released promptly
+- One fenced Quarto Python cell on success; failures go to stderr
 - A fresh in-memory Pi session for every editor invocation
 
 ## Requirements
@@ -69,10 +69,20 @@ Verify the basic interface:
 
 ```bash
 printf '' | qcell                    # no output
-printf 'print hello' | qcell         # fenced "no live kernel" cell
+printf 'print hello' | qcell         # nonzero exit: no live kernel
 ```
 
 The second command is expected to report no kernel until the Quarto setup below is running.
+
+### Fedora container
+
+As root in a Fedora container, install Helix, uv, npm, Pi, qcell, its Python dependencies, and the latest Quarto tarball:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/setup-fedora-container.sh | bash
+```
+
+The script writes Helix's config with the Dracula theme and qcell bindings. Set `QUARTO_VERSION` to install a specific Quarto release.
 
 ### Update
 
@@ -208,7 +218,7 @@ Caching or freezing can reuse old computation without starting a replacement ker
 quarto render document.qmd --cache-refresh
 ```
 
-Then start or continue Preview. Do not trust an old `.qcell-kernel.json`; qcell checks that its connection file, interpreter, and PID are still valid.
+Then start or continue Preview. An old `.qcell-kernel.json` will fail when qcell tries to connect; force a fresh execution to replace it.
 
 ## Configure Helix
 
@@ -303,11 +313,11 @@ It does not receive filesystem or shell tools. qcell uses:
 - a fixed system prompt;
 - a terminating `emit_cell` result.
 
-Exploratory output is capped at about 30 KB. Unsupported rich output is represented by compact markers such as `[image/png output]`. Infinite exploratory code is interrupted after five seconds, and the helper process has a slightly longer grace timeout. The agent work has a hard 18-second limit, including model latency and all tool calls, leaving startup headroom so Helix is released within 20 seconds.
+Exploratory output is capped at about 30 KB. Unsupported rich output is represented by compact markers such as `[image/png output]`. Infinite exploratory code is interrupted after five seconds. Agent work has a hard 10-second limit.
 
 ## Troubleshooting
 
-### `# qcell: no live Quarto kernel found`
+### `qcell: no live Quarto kernel found`
 
 Check all of the following:
 
@@ -319,7 +329,7 @@ Check all of the following:
 - The recorded kernel PID is still alive.
 - Restart Quarto Preview after adding or changing the daemon setting.
 
-### `# qcell: agent failed`
+### Agent failure
 
 Run qcell in a terminal to see stderr:
 
@@ -367,13 +377,7 @@ Success:
 ```
 ````
 
-Failures remain valid Quarto cells, for example:
-
-````text
-```{python}
-# qcell: agent failed
-```
-````
+Failures exit nonzero, write diagnostics to stderr, and write nothing to stdout. This lets Helix retain the selected instruction and show the error.
 
 No model prose, streaming output, logs, or ANSI codes are written to stdout.
 
