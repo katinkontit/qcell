@@ -7,7 +7,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 dnf -y update
-dnf -y install helix uv npm git
+dnf -y install helix uv npm git dnf-plugins-core
+dnf -y copr enable lihaohong/yazi
+dnf -y install yazi
+
+curl -fsSL https://herdr.dev/install.sh \
+  | HERDR_INSTALL_DIR=/usr/local/bin sh
 
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
@@ -18,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh \
     bash
 
 uv pip install --system ipykernel jupyter-client jupyter-cache
-uv pip install --system numpy pandas matplotlib seaborn scipy statsmodels scikitlearn sympy polars pymc
+uv pip install --system numpy pandas matplotlib seaborn scipy statsmodels scikit-learn sympy polars pymc
 
 HELIX_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/helix/config.toml"
 mkdir -p "$(dirname "$HELIX_CONFIG")"
@@ -62,31 +67,10 @@ Path(".qcell-kernel.json").write_text(json.dumps({
 ```
 QMD
 
-case "$(uname -m)" in
-  x86_64) QUARTO_ARCH=amd64 ;;
-  aarch64 | arm64) QUARTO_ARCH=arm64 ;;
-  *)
-    printf 'Unsupported architecture: %s\n' "$(uname -m)" >&2
-    exit 1
-    ;;
-esac
-
-if [[ -z "${QUARTO_VERSION:-}" ]]; then
-  QUARTO_VERSION="$(
-    curl -fsSL https://api.github.com/repos/quarto-dev/quarto-cli/releases/latest \
-      | node -e '
-          const fs = require("node:fs");
-          const release = JSON.parse(fs.readFileSync(0, "utf8"));
-          process.stdout.write(release.tag_name.replace(/^v/, ""));
-        '
-  )"
-fi
-
-QUARTO_DIR="/opt/quarto/$QUARTO_VERSION"
-QUARTO_URL="https://github.com/quarto-dev/quarto-cli/releases/download/v$QUARTO_VERSION/quarto-$QUARTO_VERSION-linux-$QUARTO_ARCH.tar.gz"
-rm -rf "$QUARTO_DIR"
+QUARTO_DIR="/opt/quarto/latest"
 mkdir -p "$QUARTO_DIR"
-curl -fsSL "$QUARTO_URL" | tar -xz -C "$QUARTO_DIR" --strip-components=1
+curl -fsSL https://quarto.org/download/latest/quarto-linux-arm64.tar.gz \
+  | tar -xz -C "$QUARTO_DIR" --strip-components=1
 ln -sfn "$QUARTO_DIR/bin/quarto" /usr/local/bin/quarto
 
 printf '\nInstalled:\n'
@@ -95,6 +79,8 @@ printf '  uv:     %s\n' "$(uv --version)"
 printf '  npm:    %s\n' "$(npm --version)"
 printf '  Pi:     %s\n' "$(pi --version)"
 printf '  qcell:  /usr/local/bin/qcell\n'
+printf '  Herdr:  %s\n' "$(herdr --version)"
+printf '  Yazi:   %s\n' "$(yazi --version | head -n 1)"
 printf '  Quarto: %s\n' "$(quarto --version)"
-printf '  Starter: %s/a/a.qmd\n' "$HOME"
+printf '  Starter: %s/a/v1.qmd\n' "$HOME"
 printf '\nRun pi, then enter /login to authenticate.\n'
