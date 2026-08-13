@@ -6,14 +6,7 @@ BIN_DIR="${QCELL_BIN_DIR:-$HOME/.local/bin}"
 REPOSITORY="${QCELL_REPOSITORY:-katinkontit/qcell}"
 REF="${QCELL_REF:-main}"
 
-command -v node >/dev/null || { echo "qcell requires Node.js" >&2; exit 1; }
-command -v npm >/dev/null || { echo "qcell requires npm" >&2; exit 1; }
-
-GLOBAL_MODULES="$(npm root --global)"
-GLOBAL_PI="$GLOBAL_MODULES/@earendil-works/pi-coding-agent"
-if [[ ! -d "$GLOBAL_PI" ]]; then
-  npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-fi
+GLOBAL_PI="$(npm root --global)/@earendil-works/pi-coding-agent"
 
 SOURCE_DIR=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]]; then

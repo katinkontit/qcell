@@ -55,7 +55,7 @@ cd qcell
 ./install.sh
 ```
 
-The installer ensures Pi is installed globally with npm, installs qcell and its Python bridge under `~/.local/lib/qcell`, links qcell to the global Pi SDK, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
+The installer expects Pi to be installed globally with npm. It installs qcell and its Python bridge under `~/.local/lib/qcell`, links qcell to the global Pi SDK, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
 
 Ensure `~/.local/bin` is in `PATH`:
 
