@@ -34,7 +34,7 @@ SCRIPT_DIR=""
 if [[ -n "$SCRIPT_PATH" ]]; then
   SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" 2>/dev/null && pwd || true)"
 fi
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/qcell.mjs" && -f "$SCRIPT_DIR/package-lock.json" ]]; then
+if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/qcell.mjs" && -f "$SCRIPT_DIR/kernel_helper.py" && -f "$SCRIPT_DIR/package-lock.json" ]]; then
   SOURCE_DIR="$SCRIPT_DIR"
 else
   require curl
@@ -52,6 +52,7 @@ INSTALL_REAL="$(cd "$INSTALL_DIR" && pwd -P)"
 
 if [[ "$SOURCE_REAL" != "$INSTALL_REAL" ]]; then
   install -m 755 "$SOURCE_DIR/qcell.mjs" "$INSTALL_DIR/qcell.mjs"
+  install -m 644 "$SOURCE_DIR/kernel_helper.py" "$INSTALL_DIR/kernel_helper.py"
   install -m 644 "$SOURCE_DIR/package.json" "$INSTALL_DIR/package.json"
   install -m 644 "$SOURCE_DIR/package-lock.json" "$INSTALL_DIR/package-lock.json"
 else

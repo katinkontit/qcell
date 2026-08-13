@@ -8,7 +8,7 @@ It uses the Pi SDK in-process and can inspect the live Python kernel associated 
 instruction selected in Helix
         ↓
 qcell → Pi SDK agent
-        ├── python: inspect the live Quarto kernel
+        ├── live_kernel: inspect the live Quarto kernel
         └── emit_cell: return final Python source
         ↓
 ```{python}
@@ -18,9 +18,9 @@ qcell → Pi SDK agent
 
 ## Properties
 
-- One executable Node.js program: `qcell.mjs`
+- One Node.js command plus a small Python Jupyter bridge: `qcell.mjs` and `kernel_helper.py`
 - No Pi CLI subprocess, extension, daemon, or persistent Pi session
-- Exactly two model-visible tools: `python` and `emit_cell`
+- Exactly two model-visible tools: `live_kernel` and `emit_cell`
 - Optional full-QMD context with `-qmd`, plus live-kernel inspection
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
@@ -55,7 +55,7 @@ cd qcell
 ./install.sh
 ```
 
-The installer checks for Node.js 20+, installs the locked npm dependencies under `~/.local/lib/qcell`, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
+The installer checks for Node.js 20+, installs qcell and its Python bridge with the locked npm dependencies under `~/.local/lib/qcell`, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
 
 Ensure `~/.local/bin` is in `PATH`:
 
@@ -290,7 +290,7 @@ The final cell must not depend on temporary variables created only during explor
 The model sees only:
 
 ```text
-python
+live_kernel
 emit_cell
 ```
 
