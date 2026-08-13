@@ -38,6 +38,8 @@ TOML
 
 mkdir -p "$CONFIG_HOME/herdr"
 cat >"$CONFIG_HOME/herdr/config.toml" <<'TOML'
+onboarding = false
+
 [theme]
 name = "dracula"
 TOML
@@ -99,3 +101,9 @@ printf '  Yazi:   %s\n' "$(yazi --version | head -n 1)"
 printf '  Quarto: %s\n' "$(quarto --version)"
 printf '  Starter: %s/a/v1.qmd\n' "$HOME"
 printf '\nRun pi, then enter /login to authenticate.\n'
+
+cd "$HOME/a"
+if [[ -t 1 && -r /dev/tty && -w /dev/tty ]]; then
+  exec herdr </dev/tty >/dev/tty 2>&1
+fi
+printf 'Start the workspace with: cd "%s/a" && herdr\n' "$HOME"
