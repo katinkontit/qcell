@@ -7,7 +7,8 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 dnf -y upgrade
-dnf -y install helix uv npm curl tar gzip
+dnf -y update
+dnf -y install helix uv npm git
 
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
