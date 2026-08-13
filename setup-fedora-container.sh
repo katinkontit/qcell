@@ -7,7 +7,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 dnf -y update
-dnf -y install helix uv npm git dnf-plugins-core
+dnf -y install helix uv npm git
 dnf -y copr enable lihaohong/yazi
 dnf -y install yazi
 
@@ -86,18 +86,6 @@ mkdir -p "$QUARTO_DIR"
 curl -fsSL https://quarto.org/download/latest/quarto-linux-arm64.tar.gz \
   | tar -xz -C "$QUARTO_DIR" --strip-components=1
 ln -sfn "$QUARTO_DIR/bin/quarto" /usr/local/bin/quarto
-
-printf '\nInstalled:\n'
-printf '  Helix:  %s\n' "$(hx --version | head -n 1)"
-printf '  uv:     %s\n' "$(uv --version)"
-printf '  npm:    %s\n' "$(npm --version)"
-printf '  Pi:     %s\n' "$(pi --version)"
-printf '  qcell:  /usr/local/bin/qcell\n'
-printf '  Herdr:  %s\n' "$(herdr --version)"
-printf '  Yazi:   %s\n' "$(yazi --version | head -n 1)"
-printf '  Quarto: %s\n' "$(quarto --version)"
-printf '  Starter: %s/a/v1.qmd\n' "$HOME"
-printf '\nRun pi, then enter /login to authenticate.\n'
 
 cd "$HOME/a"
 if [[ -t 1 && -r /dev/tty && -w /dev/tty ]]; then
