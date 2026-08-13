@@ -82,7 +82,7 @@ As root in a Fedora container, install Helix, uv, npm, Pi, qcell, its Python dep
 curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/setup-fedora-container.sh | bash
 ```
 
-The script writes Helix's config with the Dracula theme and qcell bindings, then creates a starter document at `~/a/a.qmd`. Set `QUARTO_VERSION` to install a specific Quarto release.
+The script installs Pi globally with npm. qcell links to that installation and its TypeBox dependency instead of installing another Pi copy. It also writes Helix's config with the Dracula theme and qcell bindings, then creates a starter document at `~/a/a.qmd`. Set `QUARTO_VERSION` to install a specific Quarto release.
 
 ### Update
 

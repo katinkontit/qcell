@@ -59,10 +59,22 @@ else
   chmod 755 "$INSTALL_DIR/qcell.mjs"
 fi
 
-(
-  cd "$INSTALL_DIR"
-  npm ci --omit=dev
-)
+if [[ "${QCELL_USE_GLOBAL_MODULES:-0}" == 1 ]]; then
+  GLOBAL_MODULES="$(npm root --global)"
+  GLOBAL_PI="$GLOBAL_MODULES/@earendil-works/pi-coding-agent"
+  [[ -d "$GLOBAL_PI" ]] || fail "global Pi installation not found"
+  [[ -d "$GLOBAL_PI/node_modules/typebox" ]] \
+    || fail "TypeBox not found in the global Pi installation"
+  rm -rf "$INSTALL_DIR/node_modules"
+  mkdir -p "$INSTALL_DIR/node_modules/@earendil-works"
+  ln -s "$GLOBAL_PI" "$INSTALL_DIR/node_modules/@earendil-works/pi-coding-agent"
+  ln -s "$GLOBAL_PI/node_modules/typebox" "$INSTALL_DIR/node_modules/typebox"
+else
+  (
+    cd "$INSTALL_DIR"
+    npm ci --omit=dev
+  )
+fi
 
 LINK="$BIN_DIR/qcell"
 if [[ -e "$LINK" && ! -L "$LINK" ]]; then
