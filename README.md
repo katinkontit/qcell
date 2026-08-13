@@ -47,15 +47,7 @@ Run the installer directly from GitHub:
 curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh | bash
 ```
 
-Or clone the repository, inspect the installer, and run it locally:
-
-```bash
-git clone https://github.com/katinkontit/qcell.git
-cd qcell
-./install.sh
-```
-
-The installer expects Pi to be installed globally with npm. It installs qcell and its Python bridge under `~/.local/lib/qcell`, links qcell to the global Pi SDK, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
+The installer expects Pi to be installed globally with npm. It downloads qcell and its Python bridge under `~/.local/lib/qcell`, links qcell to the global Pi SDK, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
 
 Ensure `~/.local/bin` is in `PATH`:
 
@@ -92,16 +84,9 @@ Rerun the installer:
 curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh | bash
 ```
 
-When installing from a clone, pull and rerun the local script instead:
-
-```bash
-git pull --ff-only
-./install.sh
-```
-
 ### Custom install paths
 
-The installer supports environment overrides:
+The installer supports path overrides:
 
 ```bash
 QCELL_INSTALL_DIR=/opt/qcell \
