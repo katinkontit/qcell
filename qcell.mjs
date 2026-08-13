@@ -19,7 +19,7 @@ import {
 const executeFile = promisify(execFile);
 const KERNEL_HELPER = fileURLToPath(new URL("kernel_helper.py", import.meta.url));
 const KERNEL_TIMEOUT = 5;
-const AGENT_TIMEOUT = 10_000;
+const AGENT_TIMEOUT = 30_000;
 
 const SYSTEM_PROMPT = `
 Use live_kernel to inspect state for context.
