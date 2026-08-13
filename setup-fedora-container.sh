@@ -6,25 +6,13 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-dnf -y upgrade
 dnf -y update
 dnf -y install helix uv npm git
 
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
-SCRIPT_PATH="${BASH_SOURCE[0]:-}"
-SCRIPT_DIR=""
-if [[ -n "$SCRIPT_PATH" ]]; then
-  SCRIPT_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
-fi
-if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/install.sh" && -f "$SCRIPT_DIR/qcell.mjs" ]]; then
-  QCELL_INSTALL_DIR=/opt/qcell \
-  QCELL_BIN_DIR=/usr/local/bin \
-    "$SCRIPT_DIR/install.sh"
-else
-  curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh \
-    | QCELL_INSTALL_DIR=/opt/qcell QCELL_BIN_DIR=/usr/local/bin bash
-fi
+curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh \
+  | QCELL_INSTALL_DIR=/opt/qcell QCELL_BIN_DIR=/usr/local/bin bash
 
 uv pip install --system ipykernel jupyter-client jupyter-cache
 
@@ -37,6 +25,38 @@ theme = "dracula"
 a = ":pipe qcell"
 A = ":pipe qcell -qmd \"%{buffer_name}\""
 TOML
+
+mkdir -p "$HOME/a"
+cat >"$HOME/a/a.qmd" <<'QMD'
+---
+title: "a"
+execute:
+  daemon: 3600
+  cache: true
+  freeze: auto
+  echo: false
+format:
+  html:
+    code-fold: true
+---
+
+```{python}
+#| echo: false
+#| output: false
+
+import json
+import os
+import sys
+from pathlib import Path
+from ipykernel.connect import get_connection_file
+
+Path(".qcell-kernel.json").write_text(json.dumps({
+    "connection_file": get_connection_file(),
+    "pid": os.getpid(),
+    "python": sys.executable,
+}))
+```
+QMD
 
 case "$(uname -m)" in
   x86_64) QUARTO_ARCH=amd64 ;;
@@ -72,4 +92,5 @@ printf '  npm:    %s\n' "$(npm --version)"
 printf '  Pi:     %s\n' "$(pi --version)"
 printf '  qcell:  /usr/local/bin/qcell\n'
 printf '  Quarto: %s\n' "$(quarto --version)"
+printf '  Starter: %s/a/a.qmd\n' "$HOME"
 printf '\nRun pi, then enter /login to authenticate.\n'
