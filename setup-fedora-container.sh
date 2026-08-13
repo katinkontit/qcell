@@ -18,6 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh \
     bash
 
 uv pip install --system ipykernel jupyter-client jupyter-cache
+uv pip install --system numpy pandas matplotlib seaborn scipy statsmodels scikitlearn sympy polars pymc
 
 HELIX_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/helix/config.toml"
 mkdir -p "$(dirname "$HELIX_CONFIG")"
@@ -30,9 +31,9 @@ A = ":pipe qcell -qmd \"%{buffer_name}\""
 TOML
 
 mkdir -p "$HOME/a"
-cat >"$HOME/a/a.qmd" <<'QMD'
+cat >"$HOME/a/v1.qmd" <<'QMD'
 ---
-title: "a"
+title: "v1"
 execute:
   daemon: 3600
   cache: true
