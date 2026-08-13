@@ -17,10 +17,7 @@ curl -fsSL https://herdr.dev/install.sh \
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
 curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh \
-  | QCELL_INSTALL_DIR=/opt/qcell \
-    QCELL_BIN_DIR=/usr/local/bin \
-    QCELL_USE_GLOBAL_MODULES=1 \
-    bash
+  | QCELL_INSTALL_DIR=/opt/qcell QCELL_BIN_DIR=/usr/local/bin bash
 
 uv pip install --system ipykernel jupyter-client jupyter-cache
 uv pip install --system numpy pandas matplotlib seaborn scipy statsmodels scikit-learn sympy polars pymc

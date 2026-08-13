@@ -55,7 +55,7 @@ cd qcell
 ./install.sh
 ```
 
-The installer checks for Node.js 20+, installs qcell and its Python bridge with the locked npm dependencies under `~/.local/lib/qcell`, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
+The installer ensures Pi is installed globally with npm, installs qcell and its Python bridge under `~/.local/lib/qcell`, links qcell to the global Pi SDK, and creates `~/.local/bin/qcell`. It does not modify shell startup files or Python environments.
 
 Ensure `~/.local/bin` is in `PATH`:
 
