@@ -25,14 +25,29 @@ curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh \
 uv pip install --system ipykernel jupyter-client jupyter-cache
 uv pip install --system numpy pandas matplotlib seaborn scipy statsmodels scikit-learn sympy polars pymc
 
-HELIX_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/helix/config.toml"
-mkdir -p "$(dirname "$HELIX_CONFIG")"
-cat >"$HELIX_CONFIG" <<'TOML'
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+mkdir -p "$CONFIG_HOME/helix"
+cat >"$CONFIG_HOME/helix/config.toml" <<'TOML'
 theme = "dracula"
 
 [keys.normal.space]
 a = ":pipe qcell"
 A = ":pipe qcell -qmd \"%{buffer_name}\""
+TOML
+
+mkdir -p "$CONFIG_HOME/herdr"
+cat >"$CONFIG_HOME/herdr/config.toml" <<'TOML'
+[theme]
+name = "dracula"
+TOML
+
+mkdir -p "$CONFIG_HOME/yazi"
+ya pkg add yazi-rs/flavors:dracula
+cat >"$CONFIG_HOME/yazi/theme.toml" <<'TOML'
+[flavor]
+dark = "dracula"
+light = "dracula"
 TOML
 
 mkdir -p "$HOME/a"

@@ -82,7 +82,7 @@ As root in an ARM64 Fedora container, install Helix, uv, npm, Pi, qcell, Herdr, 
 curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/setup-fedora-container.sh | bash
 ```
 
-The script installs Pi globally with npm. qcell links to that installation and its TypeBox dependency instead of installing another Pi copy. It also writes Helix's config with the Dracula theme and qcell bindings, then creates a starter document at `~/a/v1.qmd`.
+The script installs Pi globally with npm. qcell links to that installation and its TypeBox dependency instead of installing another Pi copy. It also configures the Dracula theme for Helix, Herdr, and Yazi, adds the qcell Helix bindings, then creates a starter document at `~/a/v1.qmd`.
 
 ### Update
 
