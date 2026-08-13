@@ -9,10 +9,9 @@ fi
 dnf -y update
 dnf -y install helix uv npm git
 
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-
 curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/install.sh \
   | QCELL_INSTALL_DIR=/opt/qcell QCELL_BIN_DIR=/usr/local/bin bash
+ln -sfn /opt/qcell/node_modules/.bin/pi /usr/local/bin/pi
 
 uv pip install --system ipykernel jupyter-client jupyter-cache
 
