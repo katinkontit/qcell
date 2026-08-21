@@ -117,10 +117,7 @@ async function generateCell(instruction, kernel, document, abortSignal) {
     tools: ["live_kernel", "emit_cell"],
   });
 
-  let abortPromise;
-  const abort = () => {
-    abortPromise = session.abort();
-  };
+  const abort = () => session.abort();
   abortSignal.addEventListener("abort", abort, { once: true });
   try {
     if (abortSignal.aborted) throw new Error("timed out");
@@ -128,11 +125,8 @@ async function generateCell(instruction, kernel, document, abortSignal) {
     return cell;
   } finally {
     abortSignal.removeEventListener("abort", abort);
-    try {
-      await abortPromise;
-    } finally {
-      session.dispose();
-    }
+    try { await abort(); } catch {}
+    session.dispose();
   }
 }
 
