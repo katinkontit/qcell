@@ -24,7 +24,6 @@ qcell → Pi SDK agent
 - Optional full-QMD context with `-qmd`, plus live-kernel inspection
 - Inherits the default model and thinking level from Pi settings
 - Timeouts configurable via `~/a/.qcell.conf` (`KERNEL_TIMEOUT`, `AGENT_TIMEOUT` in seconds)
-- Progress (kernel calls, cell emission) on stderr; stdout stays clean
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
 - Hard 30-second agent limit so the editor is released promptly

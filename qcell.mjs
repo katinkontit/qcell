@@ -96,16 +96,13 @@ async function generateCell(instruction, kernel, document, abortSignal) {
     parameters: Type.Object({
       code: Type.String({ description: "Python code to run" }),
     }),
-    execute: async (_id, { code }, signal) => {
-      process.stderr.write(`[qcell] kernel: ${code.replace(/\s+/g, " ").slice(0, 80)}\n`);
-      return {
-        content: [{
-          type: "text",
-          text: (await runInKernel(kernel, code, signal)) || "<no output>",
-        }],
-        details: {},
-      };
-    },
+    execute: async (_id, { code }, signal) => ({
+      content: [{
+        type: "text",
+        text: (await runInKernel(kernel, code, signal)) || "<no output>",
+      }],
+      details: {},
+    }),
   });
 
   const emitCell = defineTool({
@@ -120,7 +117,6 @@ async function generateCell(instruction, kernel, document, abortSignal) {
         throw new Error("emit_cell requires non-empty cell source");
       }
       cell = emittedCell;
-      process.stderr.write("[qcell] emitting cell\n");
       return {
         content: [{ type: "text", text: "Cell emitted." }],
         details: {},
