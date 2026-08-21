@@ -24,7 +24,7 @@ qcell → Pi SDK agent
 - Optional full-QMD context with `-qmd`, plus live-kernel inspection
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
-- Hard 10-second agent limit so the editor is released promptly
+- Hard 30-second agent limit so the editor is released promptly
 - One fenced Quarto Python cell on success; failures go to stderr
 - A fresh in-memory Pi session for every editor invocation
 
@@ -177,7 +177,7 @@ The cell creates `.qcell-kernel.json` in the document working directory. It must
 .qcell-kernel.json
 ```
 
-A complete working document, including the required cell and a sample qcell instruction, is available at [`v1.qmd`](v1.qmd). Copy it into a project rather than removing the registration cell.
+Copy the registration cell into your document verbatim; do not remove it once present.
 
 ## Start Quarto Preview
 
@@ -220,7 +220,7 @@ A = ":pipe qcell -qmd \"%{buffer_name}\""
 
 `-qmd <path>` opts into full-document context. qcell reads the saved file, so save before using `Space`, `A` when the buffer has changed. The model can then see earlier imports, variable definitions, narrative, and cell order without receiving a filesystem tool.
 
-The same snippet is in [`helix/config.toml`](helix/config.toml).
+
 
 Start Helix from the Quarto document directory so `qcell` can find `./.qcell-kernel.json`:
 
@@ -298,7 +298,7 @@ It does not receive filesystem or shell tools. qcell uses:
 - a fixed system prompt;
 - a terminating `emit_cell` result.
 
-Exploratory output is capped at about 30 KB. Unsupported rich output is represented by compact markers such as `[image/png output]`. Infinite exploratory code is interrupted after five seconds. Agent work has a hard 10-second limit.
+Exploratory output is capped at about 30 KB. Unsupported rich output is represented by compact markers such as `[image/png output]`. Infinite exploratory code is interrupted after five seconds. Agent work has a hard 30-second limit.
 
 ## Troubleshooting
 

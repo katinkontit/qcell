@@ -31,11 +31,22 @@ Cells ultimately run consecutively; the state is declarative.
 `;
 
 async function loadKernel() {
+  let kernel;
   try {
-    return JSON.parse(await readFile(".qcell-kernel.json", "utf8"));
+    kernel = JSON.parse(await readFile(".qcell-kernel.json", "utf8"));
   } catch {
     return null;
   }
+  if (!kernel?.connection_file || !kernel?.python || !Number.isInteger(kernel.pid)) return null;
+  try {
+    await readFile(path.resolve(kernel.connection_file));
+    process.kill(kernel.pid, 0);
+  } catch (error) {
+    throw new Error(
+      `stale kernel metadata in .qcell-kernel.json (${error?.code === "ESRCH" ? "kernel process is gone" : "connection file is gone"}); run the registration cell again, e.g. quarto render --cache-refresh`,
+    );
+  }
+  return kernel;
 }
 
 async function runInKernel(kernel, code, signal) {
@@ -95,14 +106,24 @@ async function generateCell(instruction, kernel, document, abortSignal) {
   const cwd = process.cwd();
   const agentDir = getAgentDir();
   let defaultModel;
+  let modelRuntimeError;
   try {
     const settings = JSON.parse(await readFile(path.join(agentDir, "settings.json"), "utf8"));
     if (settings.defaultProvider && settings.defaultModel) {
-      const modelRuntime = await ModelRuntime.create();
-      defaultModel = modelRuntime.getModel(settings.defaultProvider, settings.defaultModel) || undefined;
+      try {
+        const modelRuntime = await ModelRuntime.create();
+        defaultModel = modelRuntime.getModel(settings.defaultProvider, settings.defaultModel) || undefined;
+        if (!defaultModel) {
+          modelRuntimeError = `model "${settings.defaultProvider}/${settings.defaultModel}" not found in the model catalog`;
+        }
+      } catch (error) {
+        modelRuntimeError = `model runtime failed: ${error?.message || error}`;
+      }
     }
   } catch {}
-  if (!defaultModel) throw new Error("no default model: set defaultProvider/defaultModel in ~/.pi/agent/settings.json");
+  if (!defaultModel) {
+    throw new Error(modelRuntimeError || "no default model: set defaultProvider/defaultModel in ~/.pi/agent/settings.json");
+  }
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
     cwd,
@@ -137,7 +158,7 @@ async function generateCell(instruction, kernel, document, abortSignal) {
     if (abortSignal.aborted) throw new Error("timed out");
     await session.prompt(instruction);
     if (typeof cell !== "string") {
-      const text = (session.agent?.state?.messages || session.messages || [])
+      const text = (session.agent?.state?.messages || [])
         .filter((m) => m.role === "assistant")
         .flatMap((m) => (m.content || []).filter((c) => c.type === "text").map((c) => c.text))
         .join("\n")
