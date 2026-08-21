@@ -108,9 +108,9 @@ async function generateCell(instruction, kernel, document, abortSignal) {
   const emitCell = defineTool({
     name: "emit_cell",
     label: "Emit Cell",
-    description: "Return the complete fenced Quarto Python cell.",
+    description: "Return the complete Python cell.",
     parameters: Type.Object({
-      cell: Type.String({ description: "Complete fenced Quarto Python cell" }),
+      cell: Type.String({ description: "Complete Python cell" }),
     }),
     execute: async (_id, { cell: emittedCell }) => {
       if (typeof emittedCell !== "string" || !emittedCell.trim()) {
