@@ -12,6 +12,7 @@ import {
   DefaultResourceLoader,
   defineTool,
   getAgentDir,
+  ModelRuntime,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -79,6 +80,9 @@ async function generateCell(instruction, kernel, document, abortSignal) {
       cell: Type.String({ description: "Complete fenced Quarto Python cell" }),
     }),
     execute: async (_id, { cell: emittedCell }) => {
+      if (typeof emittedCell !== "string" || !emittedCell.trim()) {
+        throw new Error("emit_cell requires non-empty cell source");
+      }
       cell = emittedCell;
       return {
         content: [{ type: "text", text: "Cell emitted." }],
@@ -90,6 +94,15 @@ async function generateCell(instruction, kernel, document, abortSignal) {
 
   const cwd = process.cwd();
   const agentDir = getAgentDir();
+  let defaultModel;
+  try {
+    const settings = JSON.parse(await readFile(path.join(agentDir, "settings.json"), "utf8"));
+    if (settings.defaultProvider && settings.defaultModel) {
+      const modelRuntime = await ModelRuntime.create();
+      defaultModel = modelRuntime.getModel(settings.defaultProvider, settings.defaultModel) || undefined;
+    }
+  } catch {}
+  if (!defaultModel) throw new Error("no default model: set defaultProvider/defaultModel in ~/.pi/agent/settings.json");
   const settingsManager = SettingsManager.inMemory();
   const resourceLoader = new DefaultResourceLoader({
     cwd,
@@ -110,6 +123,7 @@ async function generateCell(instruction, kernel, document, abortSignal) {
   const { session } = await createAgentSession({
     cwd,
     agentDir,
+    model: defaultModel,
     resourceLoader,
     settingsManager,
     sessionManager: SessionManager.inMemory(cwd),
@@ -122,6 +136,18 @@ async function generateCell(instruction, kernel, document, abortSignal) {
   try {
     if (abortSignal.aborted) throw new Error("timed out");
     await session.prompt(instruction);
+    if (typeof cell !== "string") {
+      const text = (session.agent?.state?.messages || session.messages || [])
+        .filter((m) => m.role === "assistant")
+        .flatMap((m) => (m.content || []).filter((c) => c.type === "text").map((c) => c.text))
+        .join("\n")
+        .trim();
+      throw new Error(
+        text
+          ? `agent replied without emitting a cell: ${text.slice(0, 300)}`
+          : "agent finished without emitting a cell",
+      );
+    }
     return cell;
   } finally {
     abortSignal.removeEventListener("abort", abort);
@@ -148,7 +174,7 @@ async function main() {
   try {
     const cell = await generateCell(instruction, kernel, document, controller.signal);
     if (controller.signal.aborted) throw new Error("timed out");
-    process.stdout.write(cell);
+    process.stdout.write(String(cell));
   } catch (error) {
     if (controller.signal.aborted) throw new Error("timed out");
     throw error;
