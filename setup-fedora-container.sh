@@ -89,6 +89,15 @@ ln -sfn "$QUARTO_DIR/bin/quarto" /usr/local/bin/quarto
 
 cd "$HOME/a"
 if [[ -t 1 && -r /dev/tty && -w /dev/tty ]]; then
+  (
+    for _ in $(seq 1 60); do
+      sleep 1
+      json="$(herdr tab create --label preview --cwd "$HOME/a" 2>/dev/null)" || continue
+      pane="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["root_pane"]["pane_id"])' 2>/dev/null)" && [ -n "$pane" ] || continue
+      herdr pane run "$pane" quarto preview "$HOME/a/v1.qmd" --host 0.0.0.0 --port 8999 >/dev/null 2>&1
+      exit 0
+    done
+  ) </dev/null >/dev/null 2>&1 &
   exec herdr </dev/tty >/dev/tty 2>&1
 fi
 printf 'Start the workspace with: cd "%s/a" && herdr\n' "$HOME"

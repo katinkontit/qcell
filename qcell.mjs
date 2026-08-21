@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 import {
@@ -19,8 +20,29 @@ import {
 
 const executeFile = promisify(execFile);
 const KERNEL_HELPER = fileURLToPath(new URL("kernel_helper.py", import.meta.url));
-const KERNEL_TIMEOUT = 5;
-const AGENT_TIMEOUT = 30_000;
+
+function loadConf() {
+  const out = {};
+  const paths = [process.env.QCELL_CONF, path.join(os.homedir(), "a", ".qcell.conf")].filter(Boolean);
+  for (const file of [...new Set(paths)]) {
+    try {
+      for (const line of readFileSync(file, "utf8").split("\n")) {
+        if (/^\s*#/.test(line)) continue;
+        const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$/);
+        if (m && !(m[1] in out)) out[m[1]] = m[2];
+      }
+    } catch {}
+  }
+  return out;
+}
+
+const CONF = loadConf();
+const seconds = (name, fallback) => {
+  const value = Number(CONF[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+const KERNEL_TIMEOUT = seconds("KERNEL_TIMEOUT", 5);
+const AGENT_TIMEOUT = seconds("AGENT_TIMEOUT", 30) * 1000;
 
 const SYSTEM_PROMPT = `
 Use live_kernel to inspect state for context.
@@ -74,13 +96,16 @@ async function generateCell(instruction, kernel, document, abortSignal) {
     parameters: Type.Object({
       code: Type.String({ description: "Python code to run" }),
     }),
-    execute: async (_id, { code }, signal) => ({
-      content: [{
-        type: "text",
-        text: (await runInKernel(kernel, code, signal)) || "<no output>",
-      }],
-      details: {},
-    }),
+    execute: async (_id, { code }, signal) => {
+      process.stderr.write(`[qcell] kernel: ${code.replace(/\s+/g, " ").slice(0, 80)}\n`);
+      return {
+        content: [{
+          type: "text",
+          text: (await runInKernel(kernel, code, signal)) || "<no output>",
+        }],
+        details: {},
+      };
+    },
   });
 
   const emitCell = defineTool({
@@ -95,6 +120,7 @@ async function generateCell(instruction, kernel, document, abortSignal) {
         throw new Error("emit_cell requires non-empty cell source");
       }
       cell = emittedCell;
+      process.stderr.write("[qcell] emitting cell\n");
       return {
         content: [{ type: "text", text: "Cell emitted." }],
         details: {},
@@ -106,9 +132,13 @@ async function generateCell(instruction, kernel, document, abortSignal) {
   const cwd = process.cwd();
   const agentDir = getAgentDir();
   let defaultModel;
+  let defaultThinkingLevel;
   let modelRuntimeError;
   try {
     const settings = JSON.parse(await readFile(path.join(agentDir, "settings.json"), "utf8"));
+    if (typeof settings.defaultThinkingLevel === "string") {
+      defaultThinkingLevel = settings.defaultThinkingLevel;
+    }
     if (settings.defaultProvider && settings.defaultModel) {
       try {
         const modelRuntime = await ModelRuntime.create();
@@ -145,6 +175,7 @@ async function generateCell(instruction, kernel, document, abortSignal) {
     cwd,
     agentDir,
     model: defaultModel,
+    ...(defaultThinkingLevel ? { thinkingLevel: defaultThinkingLevel } : {}),
     resourceLoader,
     settingsManager,
     sessionManager: SessionManager.inMemory(cwd),

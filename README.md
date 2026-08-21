@@ -22,6 +22,9 @@ qcell → Pi SDK agent
 - No Pi CLI subprocess, extension, daemon, or persistent Pi session
 - Exactly two model-visible tools: `live_kernel` and `emit_cell`
 - Optional full-QMD context with `-qmd`, plus live-kernel inspection
+- Inherits the default model and thinking level from Pi settings
+- Timeouts configurable via `~/a/.qcell.conf` (`KERNEL_TIMEOUT`, `AGENT_TIMEOUT` in seconds)
+- Progress (kernel calls, cell emission) on stderr; stdout stays clean
 - No inherited `AGENTS.md`, Pi extensions, skills, prompt templates, or project settings
 - Five-second exploratory execution timeout with kernel interruption
 - Hard 30-second agent limit so the editor is released promptly
@@ -40,6 +43,18 @@ qcell → Pi SDK agent
 The Pi SDK can use its existing credential store at `~/.pi/agent/auth.json` or provider environment variables such as `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`. `qcell` itself never invokes the Pi CLI.
 
 ## Install qcell
+
+### Fedora container
+
+As root in an ARM64 Fedora container, one command installs Helix, uv, npm, Pi, qcell, Herdr, Yazi, Python data packages, and the latest Quarto tarball:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/setup-fedora-container.sh | bash
+```
+
+The script installs Pi globally with npm. qcell links to that installation and its TypeBox dependency instead of installing another Pi copy. It also configures the Dracula theme for Helix, Herdr, and Yazi, adds the qcell Helix bindings, creates `~/a/v1.qmd`, starts Herdr in `~/a` when a terminal is available, and opens a tab running `quarto preview ~/a/v1.qmd --host 0.0.0.0 --port 8999`.
+
+### Manual install
 
 Run the installer directly from GitHub:
 
@@ -65,16 +80,6 @@ printf 'print hello' | qcell         # nonzero exit: no live kernel
 ```
 
 The second command is expected to report no kernel until the Quarto setup below is running.
-
-### Fedora container
-
-As root in an ARM64 Fedora container, install Helix, uv, npm, Pi, qcell, Herdr, Yazi, Python data packages, and the latest Quarto tarball:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/katinkontit/qcell/main/setup-fedora-container.sh | bash
-```
-
-The script installs Pi globally with npm. qcell links to that installation and its TypeBox dependency instead of installing another Pi copy. It also configures the Dracula theme for Helix, Herdr, and Yazi, adds the qcell Helix bindings, creates `~/a/v1.qmd`, then starts Herdr in `~/a` when a terminal is available.
 
 ### Update
 
@@ -145,6 +150,17 @@ format:
 ```
 
 `echo` is an execution option and therefore belongs under `execute`. `code-fold` controls HTML presentation and belongs under `format.html`. Because `echo: false` hides code globally, folding matters only for cells that override `echo: true`.
+
+### Configuration
+
+Optional `KEY = VALUE` lines in `~/a/.qcell.conf` (or the file named by `QCELL_CONF`):
+
+```text
+# Seconds of exploratory kernel execution before interruption
+KERNEL_TIMEOUT = 5
+# Seconds of total agent work before qcell gives up
+AGENT_TIMEOUT = 30
+```
 
 The preview server and Python kernel are separate: a running preview page alone does not mean the kernel is alive. `cache: true` requires the `jupyter-cache` package installed above. `freeze: auto` lets Quarto reuse stored computational output when appropriate.
 
